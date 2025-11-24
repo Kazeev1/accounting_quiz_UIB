@@ -1,156 +1,146 @@
 import streamlit as st
 import docx
-from docx.shared import RGBColor
 import random
 
 
-# ---------------------------
-# Функция для чтения DOCX
-# ---------------------------
+# ------------------------------------------------
+# Парсер DOCX
+# ------------------------------------------------
 def parse_quiz_file(uploaded_file):
     doc = docx.Document(uploaded_file)
     questions = []
     current_q = None
-    RED_HEX = "FF0000"
+    RED_HEX = 'FF0000'
 
     for para in doc.paragraphs:
         text = para.text.strip()
         if not text:
             continue
 
-        # Новый вопрос начинается с "№"
         if text.startswith("№"):
             if current_q:
                 questions.append(current_q)
             current_q = {"question": text, "options": [], "correct_text": None}
 
-        elif current_q:
-            is_correct = False
+        else:
+            if current_q:
+                is_correct = False
+                for run in para.runs:
+                    if run.font.color and run.font.color.rgb and str(run.font.color.rgb) == RED_HEX:
+                        is_correct = True
+                        break
 
-            for run in para.runs:
-                if (
-                    run.font.color
-                    and run.font.color.rgb
-                    and str(run.font.color.rgb) == RED_HEX
-                ):
-                    is_correct = True
-                    break
-
-            current_q["options"].append(text)
-            if is_correct:
-                current_q["correct_text"] = text
+                current_q["options"].append(text)
+                if is_correct:
+                    current_q["correct_text"] = text
 
     if current_q:
         questions.append(current_q)
 
-    # Оставляем только валидные вопросы
-    valid = [q for q in questions if q["correct_text"]]
-
-    return valid
+    return [q for q in questions if q["correct_text"]]
 
 
-# ---------------------------
-# Streamlit UI
-# ---------------------------
-st.title("📘 Accounting Quiz — DOCX Tester")
-st.write("Загружай DOCX с вопросами, выбирай количество вопросов и проходи тест!")
+# ------------------------------------------------
+# UI
+# ------------------------------------------------
+st.title("📘 Accounting Quiz — Быстрый режим тестирования")
+st.write("Загружайте DOCX и проходите тест. Ответ показывается сразу!")
 
-# Загрузка файла
-uploaded = st.file_uploader("Загрузите docx файл с тестом", type=["docx"])
+uploaded = st.file_uploader("Загрузите файл .docx", type=["docx"])
 
 if uploaded:
-    # Загружаем базу вопросов в кеш
-    if "all_questions" not in st.session_state:
-        st.session_state.all_questions = parse_quiz_file(uploaded)
-        st.session_state.current_batch = None
-        st.session_state.user_answers = {}
-        st.session_state.step = "menu"
 
-    all_questions = st.session_state.all_questions
+    # Загружаем вопросы один раз
+    if "questions" not in st.session_state:
+        st.session_state.questions = parse_quiz_file(uploaded)
+        st.session_state.current_batch = []
+        st.session_state.index = 0
+        st.session_state.show_answer = False
+        st.session_state.selected_option = None
+        st.session_state.running = False
 
-    st.success(f"Загружено вопросов: {len(all_questions)}")
+    questions = st.session_state.questions
 
-    # ---------------------------------------
-    # Выбор количества вопросов и генерация теста
-    # ---------------------------------------
-    if st.session_state.step == "menu":
-        st.subheader("Создать новый тест")
-        num = st.number_input(
-            "Сколько вопросов взять?", min_value=1, max_value=len(all_questions), value=len(all_questions)
+    st.success(f"Загружено вопросов: {len(questions)}")
+
+    # ---------------------------------------------
+    # Меню выбора количества вопросов
+    # ---------------------------------------------
+    if not st.session_state.running:
+
+        st.subheader("Настройки теста")
+
+        count = st.slider(
+            "Сколько вопросов использовать?",
+            1,
+            len(questions),
+            len(questions),
+            step=1
         )
 
-        if st.button("Сформировать тест"):
-            st.session_state.current_batch = random.sample(all_questions, num)
-            st.session_state.user_answers = {}
-            st.session_state.step = "quiz"
+        if st.button("Начать тест"):
+            st.session_state.current_batch = random.sample(questions, count)
+            st.session_state.index = 0
+            st.session_state.running = True
+            st.session_state.show_answer = False
+            st.session_state.selected_option = None
+            st.experimental_rerun()
 
-    # ---------------------------------------
-    # Основной тест
-    # ---------------------------------------
-    if st.session_state.step == "quiz":
+    # ---------------------------------------------
+    # Основной тест — по одному вопросу
+    # ---------------------------------------------
+    if st.session_state.running:
+
         batch = st.session_state.current_batch
-        total = len(batch)
+        idx = st.session_state.index
+        q = batch[idx]
 
-        st.subheader(f"Тест из {total} вопросов")
+        st.markdown(f"### Вопрос {idx+1}/{len(batch)}")
+        st.write(q["question"])
+        st.write("---")
 
-        for i, q in enumerate(batch):
-            st.write(f"### ❓ {q['question']}")
+        # Перемешиваем варианты на каждый question
+        options = q["options"].copy()
+        random.shuffle(options)
 
-            options = q["options"].copy()
-            random.shuffle(options)
+        # Если пользователь еще не выбрал ответ
+        if not st.session_state.show_answer:
 
-            # Уникальный ключ для радиокнопок
-            key = f"q_{i}"
-
-            st.radio(
+            choice = st.radio(
                 "Выберите ответ:",
                 options,
-                key=key,
-                index=None,
+                key=f"q{idx}"
             )
 
-            st.write("---")
+            st.session_state.selected_option = choice
 
-        if st.button("Завершить тест"):
-            st.session_state.step = "results"
-
-    # ---------------------------------------
-    # Результаты
-    # ---------------------------------------
-    if st.session_state.step == "results":
-        st.subheader("📊 Результаты")
-
-        batch = st.session_state.current_batch
-        score = 0
-
-        for i, q in enumerate(batch):
-            user_answer = st.session_state.get(f"q_{i}", None)
-
-            st.write(f"### ❓ {q['question']}")
-
-            if user_answer == q["correct_text"]:
-                st.success(f"✔ Правильно: {user_answer}")
-                score += 1
-            else:
-                st.error(f"✘ Неправильно: {user_answer}")
-                st.info(f"Правильный ответ: **{q['correct_text']}**")
-
-            st.write("---")
-
-        st.write(f"## Итог: {score} из {len(batch)} ({score/len(batch)*100:.1f}%)")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            if st.button("🔁 Повторить этот тест"):
-                st.session_state.step = "quiz"
-
-        with col2:
-            if st.button("🆕 Новый тест"):
-                st.session_state.step = "menu"
-
-        with col3:
-            if st.button("🔚 Выйти"):
-                st.session_state.all_questions = None
-                st.session_state.step = "menu"
+            if st.button("Проверить ответ"):
+                st.session_state.show_answer = True
                 st.experimental_rerun()
+
+        # Если ответ проверён → показываем результат
+        else:
+            user = st.session_state.selected_option
+            correct = q["correct_text"]
+
+            if user == correct:
+                st.success(f"✔ Правильно! \n\n**{user}**")
+            else:
+                st.error(f"✘ Неправильно. Ваш ответ: **{user}**")
+                st.info(f"Правильный ответ: **{correct}**")
+
+            st.write("---")
+
+            # Кнопка "Следующий вопрос" или "Завершить"
+            if idx < len(batch) - 1:
+                if st.button("Следующий вопрос ➜"):
+                    st.session_state.index += 1
+                    st.session_state.show_answer = False
+                    st.session_state.selected_option = None
+                    st.experimental_rerun()
+            else:
+                if st.button("Завершить тест"):
+                    st.session_state.running = False
+                    st.session_state.show_answer = False
+                    st.success("Тест завершён!")
+                    st.experimental_rerun()
