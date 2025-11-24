@@ -156,9 +156,9 @@ def display_quiz_flow():
     if f"shuffled_opts_{q['id']}" not in st.session_state:
         opts = q["options"].copy()
         random.shuffle(opts)
-        st.session_state[f"shuffled_opts_{q['id']}]"] = opts
+        st.session_state[f"shuffled_opts_{q['id']}"] = opts
     
-    options = st.session_state[f"shuffled_opts_{q['id']}]"]
+    options = st.session_state[f"shuffled_opts_{q['id']}"]
 
     for opt in options:
         
@@ -256,4 +256,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
