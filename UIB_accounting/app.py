@@ -173,15 +173,15 @@ def display_quiz_flow():
                 
         disabled = st.session_state.show_feedback
         
-        st.button(
-            opt, 
-            key=f"opt_{q['id']}_{opt}", 
-            on_click=check_answer_wrapper, 
-            args=(opt, q["correct_text"]),
-            use_container_width=True,
-            disabled=disabled,
-            type=button_type
-        )
+    st.button(
+        opt,
+        key=f"answer_btn_{q['id']}_{opt}",   # ← исправленный ключ
+        on_click=check_answer_wrapper,
+        args=(opt, q["correct_text"]),
+        use_container_width=True,
+        disabled=disabled,
+        type=button_type
+    )
         
     if st.session_state.show_feedback:
         st.button(
@@ -256,5 +256,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
