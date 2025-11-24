@@ -230,7 +230,8 @@ def display_results():
 # --- ОСНОВНАЯ ФУНКЦИЯ ЗАПУСКА ---
 def main():
     initialize_session_state()
-    file_name = "buh_session.docx"
+    file_name = "UIB_accounting/buh_session.docx"
+
     
     all_questions = parse_quiz_file(file_name)
     
@@ -255,3 +256,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
