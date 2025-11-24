@@ -175,7 +175,7 @@ def display_quiz_flow():
         
     st.button(
         opt,
-        key=f"answer_btn_{q['id']}_{opt}",   # ← исправленный ключ
+        key=f"btn_{q['id']}_{opt.replace(' ', '_').replace('-', '_')}",
         on_click=check_answer_wrapper,
         args=(opt, q["correct_text"]),
         use_container_width=True,
@@ -256,6 +256,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
 
